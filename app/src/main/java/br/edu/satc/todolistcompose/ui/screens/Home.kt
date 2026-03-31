@@ -31,6 +31,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import br.edu.satc.todolistcompose.data.TaskData
 import br.edu.satc.todolistcompose.mockTaskData
+import br.edu.satc.todolistcompose.ui.TaskViewModel
 import br.edu.satc.todolistcompose.ui.components.TaskCard
 import br.edu.satc.todolistcompose.ui.theme.ToDoListComposeTheme
 import kotlinx.coroutines.launch
@@ -42,7 +43,7 @@ fun PreviewHomeScreen() {
 }
 
 @Composable
-fun HomeScreen() {
+fun HomeScreen(viewModel: TaskViewModel) {
     Box(
         modifier = Modifier
             .fillMaxSize()
