@@ -1,19 +1,18 @@
 package br.edu.satc.todolistcompose.data
 
-import androidx.room.*
-import kotlinx.coroutines.flow.Flow
+import androidx.room.Dao
+import androidx.room.Insert
+import androidx.room.Query
+import androidx.room.Update
 
 @Dao
 interface TaskDao {
-    @Query("SELECT * FROM tasks")
-    fun getAllTasks(): Flow<List<TaskData>>
+    @Query("SELECT * FROM tasks ORDER BY id ASC")
+    suspend fun getAll(): List<TaskData>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertTask(task: TaskData)
+    @Insert
+    suspend fun insert(task: TaskData): Long
 
     @Update
-    suspend fun updateTask(task: TaskData)
-
-    @Delete
-    suspend fun deleteTask(task: TaskData)
+    suspend fun update(task: TaskData)
 }

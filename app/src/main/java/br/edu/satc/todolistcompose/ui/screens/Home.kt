@@ -2,6 +2,7 @@
 
 package br.edu.satc.todolistcompose.ui.screens
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,18 +21,20 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import br.edu.satc.todolistcompose.data.AppDatabase
 import br.edu.satc.todolistcompose.data.TaskData
-import br.edu.satc.todolistcompose.mockTaskData
-import br.edu.satc.todolistcompose.ui.TaskViewModel
 import br.edu.satc.todolistcompose.ui.components.TaskCard
 import br.edu.satc.todolistcompose.ui.theme.ToDoListComposeTheme
 import kotlinx.coroutines.launch
@@ -43,36 +46,80 @@ fun PreviewHomeScreen() {
 }
 
 @Composable
-fun HomeScreen(viewModel: TaskViewModel) {
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(top = 8.dp)
-    ) {
-        // Conteúdo principal (lista de items)
-        Content()
+fun HomeScreen() {
+    val context = LocalContext.current
+    val taskDao = remember { AppDatabase.getDatabase(context).taskDao() }
+    val tasks = remember { mutableStateListOf<TaskData>() }
+    val scope = rememberCoroutineScope()
 
-        // Dialog new Task
-        NewTask()
+    LaunchedEffect(Unit) {
+        tasks.clear()
+        tasks.addAll(taskDao.getAll())
     }
-}
 
-@Composable
-fun Content() {
-    LazyColumn {
-        items(items = mockTaskData) { task ->
-            TaskCard(taskData = task, onTaskCheckedChange = { /*TODO*/ })
+    // Usando Scaffold para gerenciar o background e o FAB automaticamente
+    androidx.compose.material3.Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        floatingActionButton = {
+            NewTask(
+                onSaveTask = { title, description ->
+                    scope.launch {
+                        val id = taskDao.insert(
+                            TaskData(title = title, description = description, complete = false)
+                        ).toInt()
+
+                        tasks.add(
+                            TaskData(id = id, title = title, description = description, complete = false)
+                        )
+                    }
+                }
+            )
+        }
+    ) { paddingValues ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(paddingValues)
+                .padding(top = 8.dp)
+        ) {
+            Content(
+                tasks = tasks,
+                onTaskCheckedChange = { updatedTask ->
+                    scope.launch {
+                        taskDao.update(updatedTask)
+                        val index = tasks.indexOfFirst { it.id == updatedTask.id }
+                        if (index != -1) {
+                            tasks[index] = updatedTask
+                        }
+                    }
+                }
+            )
         }
     }
 }
 
-/**
- * NewTask abre uma janela estilo "modal". No Android conhecida por BottomSheet.
- * Aqui podemos "cadastrar uma nova Task".
- */
+@Composable
+fun Content(
+    tasks: List<TaskData>,
+    onTaskCheckedChange: (TaskData) -> Unit
+) {
+    LazyColumn {
+        items(
+            items = tasks,
+            key = { task -> task.id }
+        ) { task ->
+            TaskCard(
+                taskData = task,
+                onTaskCheckedChange = { isChecked ->
+                    onTaskCheckedChange(task.copy(complete = isChecked))
+                }
+            )
+        }
+    }
+}
 
 @Composable
-fun NewTask() {
+fun NewTask(onSaveTask: (title: String, description: String) -> Unit) {
     val sheetState = rememberModalBottomSheetState()
     val scope = rememberCoroutineScope()
     var taskTitle by remember { mutableStateOf("") }
@@ -91,7 +138,8 @@ fun NewTask() {
             icon = { Icon(Icons.Filled.Add, contentDescription = "") },
             onClick = {
                 showBottomSheet = true
-            })
+            }
+        )
     }
 
     if (showBottomSheet) {
@@ -99,48 +147,40 @@ fun NewTask() {
             onDismissRequest = {
                 showBottomSheet = false
             },
-            sheetState = sheetState,
+            sheetState = sheetState
         ) {
-            // Sheet content
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(bottom = 24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
-
                 OutlinedTextField(
                     value = taskTitle,
                     onValueChange = { taskTitle = it },
-                    label = { Text(text = "Título da tarefa") })
+                    label = { Text(text = "Título da tarefa") }
+                )
                 OutlinedTextField(
                     value = taskDescription,
                     onValueChange = { taskDescription = it },
-                    label = { Text(text = "Descrição da tarefa") })
+                    label = { Text(text = "Descrição da tarefa") }
+                )
                 Button(
                     modifier = Modifier.padding(top = 4.dp),
                     onClick = {
-                        // Aqui salvaríamos a nova Task
                         scope.launch { sheetState.hide() }.invokeOnCompletion {
                             if (!sheetState.isVisible) {
                                 showBottomSheet = false
                             }
                         }
 
-                        // Salva nova task
-                        mockTaskData.add(
-                            TaskData(
-                                title = taskTitle,
-                                description = taskDescription,
-                                complete = false
-                            )
-                        )
+                        onSaveTask(taskTitle, taskDescription)
 
-                        // Limpa os campos
                         taskTitle = ""
                         taskDescription = ""
-
-                    }) {
+                    }
+                ) {
                     Text("Salvar")
                 }
             }

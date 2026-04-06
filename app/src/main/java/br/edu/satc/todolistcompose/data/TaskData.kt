@@ -9,5 +9,5 @@ data class TaskData(
     val id: Int = 0,
     val title: String,
     val description: String,
-    var done: Boolean
+    val complete: Boolean
 )
